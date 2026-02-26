@@ -63,6 +63,23 @@ struct GraphView: View {
                         }
                     }
 
+                    // Remote-tracking labels (origin/<branch>)
+                    ForEach(engine.branches) { branch in
+                        if let remoteCommitId = engine.remoteBranches[branch.name],
+                           let remoteCommit = engine.commits.first(where: { $0.id == remoteCommitId }) {
+                            let pos = engine.position(for: remoteCommit, canvasWidth: canvasW)
+                            RemoteTrackingLabel(remoteName: engine.remoteName, branchName: branch.name, color: branch.color)
+                                .position(x: pos.x + DS.laneWidth * 0.5 + 50,
+                                          y: pos.y + (engine.branches(for: remoteCommitId).isEmpty ? 0 : 24))
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.6).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Remote tracking: \(engine.remoteName)/\(branch.name)")
+                        }
+                    }
+
                     // Tag labels
                     ForEach(engine.tags) { tag in
                         if let taggedCommit = engine.commits.first(where: { $0.id == tag.commitId }) {
@@ -271,6 +288,37 @@ struct TagLabel: View {
                 .overlay(
                     Capsule()
                         .strokeBorder(DS.warning.opacity(0.4), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Remote Tracking Label
+struct RemoteTrackingLabel: View {
+    let remoteName: String
+    let branchName: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "icloud")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundColor(Color(hex: "#0891B2"))
+            Text("\(remoteName)/\(branchName)")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(Color(hex: "#0891B2"))
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(Color(hex: "#0891B2").opacity(0.12))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            Color(hex: "#0891B2").opacity(0.45),
+                            style: StrokeStyle(lineWidth: 1, dash: [3, 2])
+                        )
                 )
         )
     }

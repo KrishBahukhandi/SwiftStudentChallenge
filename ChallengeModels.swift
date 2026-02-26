@@ -88,6 +88,20 @@ final class ChallengeEngine: ObservableObject, @unchecked Sendable {
 
     let challenges = GitChallengeData.all
 
+    // MARK: - Persistence
+    private let persistenceKey = "completedChallengeIds_v1"
+
+    init() {
+        // Load saved progress from UserDefaults
+        if let saved = UserDefaults.standard.array(forKey: persistenceKey) as? [String] {
+            completedChallengeIds = Set(saved)
+        }
+    }
+
+    private func saveProgress() {
+        UserDefaults.standard.set(Array(completedChallengeIds), forKey: persistenceKey)
+    }
+
     // MARK: - Goal Evaluation
 
     func isSatisfied(_ goal: ChallengeGoal) -> Bool {
@@ -152,6 +166,15 @@ final class ChallengeEngine: ObservableObject, @unchecked Sendable {
             engine.commit(message: "Release candidate 1")
             engine.commit(message: "Release candidate 2")
             engine.checkout(branchName: "main")
+        case "ch9":
+            // Set up: dev branches off main, gets one commit;
+            // then main advances one commit so a rebase is meaningful.
+            engine.createBranch(name: "dev")
+            engine.checkout(branchName: "dev")
+            engine.commit(message: "Dev: new feature")
+            engine.checkout(branchName: "main")
+            engine.commit(message: "Main: hotfix patch")
+            engine.checkout(branchName: "dev")
         default:
             break  // challenges 1-5, 7 start with the default state
         }
@@ -162,6 +185,7 @@ final class ChallengeEngine: ObservableObject, @unchecked Sendable {
         if isSatisfied(ch.goal) {
             isComplete = true
             completedChallengeIds.insert(ch.id)
+            saveProgress()
             let gen = UINotificationFeedbackGenerator()
             gen.notificationOccurred(.success)
         }
@@ -302,6 +326,20 @@ struct GitChallengeData {
                 "Create a tag called 'v2.0.0' to mark the release."
             ],
             operations: ["git merge", "git tag v2.0.0"]
+        ),
+
+        GitChallenge(
+            id: "ch9",
+            title: "Rebase & Linearise",
+            description: "A 'dev' branch diverged from 'main'. Rebase 'dev' onto 'main' to create a clean, linear history.",
+            difficulty: .hard,
+            goal: .rebasedBranch,
+            hints: [
+                "You are currently on 'dev'. Open the Rebase tab in the command panel.",
+                "Select 'main' as the target to rebase onto.",
+                "After rebasing, the graph will show 'dev' sitting linearly on top of 'main'."
+            ],
+            operations: ["git rebase main"]
         ),
     ]
 }

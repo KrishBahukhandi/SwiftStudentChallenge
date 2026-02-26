@@ -89,18 +89,28 @@ enum GitOperation: CustomStringConvertible {
     case cherryPick(hash: String)
     case tag(name: String)
     case deleteBranch(name: String)
+    case stash
+    case stashPop
+    case fetch(remote: String)
+    case push(branch: String, remote: String)
+    case pull(branch: String, remote: String)
 
     var description: String {
         switch self {
-        case .commit(let msg):    return "git commit -m \"\(msg)\""
-        case .branch(let name):   return "git branch \(name)"
-        case .checkout(let name): return "git checkout \(name)"
-        case .merge(let name):    return "git merge \(name)"
-        case .rebase(let onto):   return "git rebase \(onto)"
-        case .reset(let hash):    return "git reset --hard \(String(hash.prefix(7)))"
-        case .cherryPick(let h):  return "git cherry-pick \(String(h.prefix(7)))"
-        case .tag(let name):      return "git tag \(name)"
-        case .deleteBranch(let n):return "git branch -d \(n)"
+        case .commit(let msg):              return "git commit -m \"\(msg)\""
+        case .branch(let name):             return "git branch \(name)"
+        case .checkout(let name):           return "git checkout \(name)"
+        case .merge(let name):              return "git merge \(name)"
+        case .rebase(let onto):             return "git rebase \(onto)"
+        case .reset(let hash):              return "git reset --hard \(String(hash.prefix(7)))"
+        case .cherryPick(let h):            return "git cherry-pick \(String(h.prefix(7)))"
+        case .tag(let name):               return "git tag \(name)"
+        case .deleteBranch(let n):          return "git branch -d \(n)"
+        case .stash:                        return "git stash"
+        case .stashPop:                     return "git stash pop"
+        case .fetch(let remote):            return "git fetch \(remote)"
+        case .push(let branch, let remote): return "git push \(remote) \(branch)"
+        case .pull(let branch, let remote): return "git pull \(remote) \(branch)"
         }
     }
 
@@ -115,6 +125,11 @@ enum GitOperation: CustomStringConvertible {
         case .cherryPick:  return "smallcircle.filled.circle"
         case .tag:         return "tag.fill"
         case .deleteBranch:return "trash"
+        case .stash:       return "archivebox.fill"
+        case .stashPop:    return "archivebox.circle.fill"
+        case .fetch:       return "arrow.down.to.line"
+        case .push:        return "icloud.and.arrow.up"
+        case .pull:        return "icloud.and.arrow.down"
         }
     }
 }

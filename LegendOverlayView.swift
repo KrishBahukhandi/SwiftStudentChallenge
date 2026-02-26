@@ -16,7 +16,7 @@ struct LegendOverlayView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Understanding the Graph")
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Text("What every element means")
                                 .font(.system(size: 13, design: .rounded))
                                 .foregroundColor(DS.textMuted)
@@ -168,7 +168,7 @@ private struct LegendRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Text(detail)
                     .font(.system(size: 12, design: .rounded))
                     .foregroundColor(DS.textMuted)

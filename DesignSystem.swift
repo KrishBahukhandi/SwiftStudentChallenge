@@ -1,48 +1,98 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Design Tokens
 enum DS {
-    // Background layers
-    static let bg0       = Color(hex: "#0A0A14")   // deepest background
-    static let bg1       = Color(hex: "#111124")   // card/panel background
-    static let bg2       = Color(hex: "#1A1A30")   // elevated surface
-    static let bg3       = Color(hex: "#242440")   // highest surface
+    // ── Background layers (dark / light adaptive) ──────────────
+    static var bg0: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#0A0A14"))
+                : UIColor(Color(hex: "#F2F0FF"))
+        })
+    }
+    static var bg1: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#111124"))
+                : UIColor(Color(hex: "#FFFFFF"))
+        })
+    }
+    static var bg2: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#1A1A30"))
+                : UIColor(Color(hex: "#E8E6FA"))
+        })
+    }
+    static var bg3: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#242440"))
+                : UIColor(Color(hex: "#DDDAF5"))
+        })
+    }
 
-    // Accent
-    static let accent    = Color(hex: "#7C3AED")
-    static let accentLit = Color(hex: "#A855F7")
+    // ── Accent (same in both modes — vivid purple reads on both) ─
+    static let accent     = Color(hex: "#7C3AED")
+    static let accentLit  = Color(hex: "#A855F7")
     static let accentGlow = Color(hex: "#7C3AED").opacity(0.35)
 
-    // Text
-    static let textPrimary   = Color.white
-    static let textSecondary = Color(hex: "#A1A1CC")
-    static let textMuted     = Color(hex: "#545480")
+    // ── Text (adaptive) ─────────────────────────────────────────
+    /// Primary text — auto-adapts: white in dark, near-black in light
+    static var textPrimary: Color { Color.primary }
+    static var textSecondary: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#A1A1CC"))
+                : UIColor(Color(hex: "#3D3B6B"))
+        })
+    }
+    static var textMuted: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: "#545480"))
+                : UIColor(Color(hex: "#7070A0"))
+        })
+    }
 
-    // Status
+    // ── Status (vivid — work on both backgrounds) ───────────────
     static let success = Color(hex: "#10B981")
     static let warning = Color(hex: "#F59E0B")
     static let danger  = Color(hex: "#EF4444")
     static let info    = Color(hex: "#3B82F6")
 
-    // Graph
-    static let edgeColor     = Color.white.opacity(0.15)
-    static let nodeStroke    = Color.white.opacity(0.2)
-    static let headGlow      = Color(hex: "#A855F7")
-    static let nodeSize: CGFloat = 20
+    // ── Graph ────────────────────────────────────────────────────
+    static var edgeColor: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(white: 1, alpha: 0.15)
+                : UIColor(white: 0, alpha: 0.12)
+        })
+    }
+    static var nodeStroke: Color {
+        Color(uiColor: UIColor { t in
+            t.userInterfaceStyle == .dark
+                ? UIColor(white: 1, alpha: 0.20)
+                : UIColor(white: 0, alpha: 0.15)
+        })
+    }
+    static let headGlow   = Color(hex: "#A855F7")
+    static let nodeSize: CGFloat  = 20
     static let laneWidth: CGFloat = 56
     static let rowHeight: CGFloat = 76
 
-    // Radii
-    static let radiusS: CGFloat = 8
-    static let radiusM: CGFloat = 14
-    static let radiusL: CGFloat = 20
+    // ── Radii ────────────────────────────────────────────────────
+    static let radiusS: CGFloat  = 8
+    static let radiusM: CGFloat  = 14
+    static let radiusL: CGFloat  = 20
     static let radiusXL: CGFloat = 28
 
-    // Animations
-    static let springSnappy  = Animation.spring(response: 0.35, dampingFraction: 0.72)
-    static let springBouncy  = Animation.spring(response: 0.45, dampingFraction: 0.60)
-    static let springSmooth  = Animation.spring(response: 0.6,  dampingFraction: 0.85)
-    static let easeSmooth    = Animation.easeInOut(duration: 0.4)
+    // ── Animations ───────────────────────────────────────────────
+    static let springSnappy = Animation.spring(response: 0.35, dampingFraction: 0.72)
+    static let springBouncy = Animation.spring(response: 0.45, dampingFraction: 0.60)
+    static let springSmooth = Animation.spring(response: 0.6,  dampingFraction: 0.85)
+    static let easeSmooth   = Animation.easeInOut(duration: 0.4)
 }
 
 // MARK: - Glass Card Modifier
@@ -167,19 +217,30 @@ struct TabItemLabel: View {
     let icon: String
     let title: String
     let isSelected: Bool
+    var namespace: Namespace.ID? = nil
 
     var body: some View {
         VStack(spacing: 4) {
-            Image(systemName: isSelected ? icon.replacingOccurrences(of: ".circle", with: ".circle.fill") : icon)
-                .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? DS.accentLit : DS.textMuted)
-                .scaleEffect(isSelected ? 1.1 : 1.0)
-                .animation(DS.springSnappy, value: isSelected)
+            ZStack(alignment: .bottom) {
+                Image(systemName: isSelected ? icon.replacingOccurrences(of: ".circle", with: ".circle.fill") : icon)
+                    .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? DS.accentLit : DS.textMuted)
+                    .scaleEffect(isSelected ? 1.1 : 1.0)
+                    .animation(DS.springSnappy, value: isSelected)
+                    .shadow(color: isSelected ? DS.accentLit.opacity(0.5) : .clear, radius: 6)
+            }
             Text(title)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 10, weight: isSelected ? .semibold : .medium, design: .rounded))
                 .foregroundColor(isSelected ? DS.accentLit : DS.textMuted)
+
+            // Active indicator pill
+            Capsule()
+                .fill(isSelected ? DS.accentLit : Color.clear)
+                .frame(width: isSelected ? 24 : 0, height: 3)
+                .shadow(color: isSelected ? DS.accentLit.opacity(0.7) : .clear, radius: 4)
+                .animation(DS.springSnappy, value: isSelected)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
     }
 }

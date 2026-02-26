@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Binding var hasSeenOnboarding: Bool
+    @Binding var selectedTab: Int
 
     @State private var titleOpacity: Double = 0
     @State private var titleOffset: CGFloat = 30
@@ -44,6 +45,13 @@ struct OnboardingView: View {
                         .opacity(titleOpacity)
                         .offset(y: titleOffset)
 
+                    Text("Every developer uses Git without ever\nseeing it. This changes that.")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(DS.accent.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .opacity(titleOpacity)
+                        .offset(y: titleOffset)
+
                     Text("Learn how Git works through\nbeautiful, animated commit graphs.")
                         .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundColor(DS.textSecondary)
@@ -63,10 +71,11 @@ struct OnboardingView: View {
                 Spacer()
 
                 // Feature pills
-                HStack(spacing: 12) {
-                    FeaturePill(icon: "book.fill", text: "Learn", color: DS.info)
-                    FeaturePill(icon: "circle.hexagongrid.fill", text: "Visualise", color: DS.accent)
-                    FeaturePill(icon: "play.circle.fill", text: "Sandbox", color: DS.success)
+                HStack(spacing: 10) {
+                    FeaturePill(icon: "book.fill",         text: "Learn",     color: DS.info)
+                    FeaturePill(icon: "circle.hexagongrid.fill", text: "Sandbox", color: DS.accent)
+                    FeaturePill(icon: "flowchart.fill",    text: "Flows",     color: DS.success)
+                    FeaturePill(icon: "trophy.fill",       text: "Challenge", color: DS.warning)
                 }
                 .opacity(buttonsOpacity)
                 .offset(y: buttonsOffset)
@@ -77,6 +86,7 @@ struct OnboardingView: View {
                 VStack(spacing: 12) {
                     Button("Start Learning") {
                         withAnimation(DS.springBouncy) {
+                            selectedTab = 0
                             hasSeenOnboarding = true
                         }
                     }
@@ -86,14 +96,15 @@ struct OnboardingView: View {
                     .accessibilityLabel("Start Learning")
                     .accessibilityHint("Opens the guided Git lessons")
 
-                    Button("Go to Sandbox") {
+                    Button("Explore Sandbox") {
                         withAnimation(DS.springBouncy) {
+                            selectedTab = 1
                             hasSeenOnboarding = true
                         }
                     }
                     .buttonStyle(GhostButtonStyle())
                     .frame(maxWidth: 280)
-                    .accessibilityLabel("Go to Sandbox")
+                    .accessibilityLabel("Explore Sandbox")
                     .accessibilityHint("Opens freeplay mode to experiment with Git commands")
                 }
                 .opacity(buttonsOpacity)

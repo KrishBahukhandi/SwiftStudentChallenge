@@ -17,7 +17,7 @@ struct GitFlowsView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Git Flows")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("Real-world branching strategies")
                             .font(.system(size: 13, design: .rounded))
                             .foregroundColor(DS.textMuted)
@@ -71,6 +71,10 @@ struct GitFlowsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) {
                         GitFlowDetailView(flow: flows[selectedFlow])
+
+                        // ── Compare all flows ─────────────────────
+                        FlowComparisonTable()
+                            .padding(.top, 4)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 20)
@@ -148,7 +152,7 @@ struct GitFlowDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(step.title)
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .multilineTextAlignment(.leading)
                                 Text(step.detail)
                                     .font(.system(size: 12, design: .rounded))
@@ -547,3 +551,93 @@ struct GitFlow: Identifiable {
         cons: ["Long-lived branches cause merge conflicts", "Slower than trunk-based"]
     )
 }
+
+// MARK: - Flow Comparison Table
+struct FlowComparisonTable: View {
+    // (criteria, [GitHub Flow, GitFlow, Trunk-Based, Feature Branch])
+    private let rows: [(String, String, [String])] = [
+        ("👥", "Team size",       ["Any",         "Medium+",   "Any",         "Any"]),
+        ("🚀", "Releases",        ["Continuous",  "Scheduled", "Continuous",  "Flexible"]),
+        ("⚙️", "CI/CD",           ["Required",    "Helpful",   "Required",    "Optional"]),
+        ("🧩", "Complexity",      ["Low",         "High",      "Low",         "Medium"]),
+        ("🔀", "Branch style",    ["Short-lived", "Long-lived","main only",   "Per feature"]),
+        ("✅", "Best for",        ["SaaS / web",  "Enterprise","High-freq",   "Open source"]),
+    ]
+
+    private let headers = ["GitHub Flow", "GitFlow", "Trunk-Based", "Feature Branch"]
+    private let headerColors: [Color] = [DS.info, DS.success, DS.warning, DS.accent]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Section header
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(DS.accentLit)
+                    .accessibilityHidden(true)
+                Text("Pick Your Flow — Quick Comparison")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(DS.textMuted)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header row
+                    HStack(spacing: 0) {
+                        Text("Criteria")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(DS.textMuted)
+                            .frame(width: 110, alignment: .leading)
+                            .padding(.leading, 14)
+                        ForEach(Array(headers.enumerated()), id: \.offset) { i, h in
+                            Text(h)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundColor(headerColors[i])
+                                .frame(width: 100, alignment: .center)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .background(DS.bg2)
+
+                    // Data rows
+                    ForEach(Array(rows.enumerated()), id: \.offset) { rowIdx, row in
+                        let (emoji, label, values) = row
+                        HStack(spacing: 0) {
+                            // Criteria label
+                            HStack(spacing: 6) {
+                                Text(emoji).font(.system(size: 12))
+                                    .accessibilityHidden(true)
+                                Text(label)
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundColor(DS.textSecondary)
+                            }
+                            .frame(width: 110, alignment: .leading)
+                            .padding(.leading, 14)
+
+                            // Value cells
+                            ForEach(Array(values.enumerated()), id: \.offset) { colIdx, val in
+                                Text(val)
+                                    .font(.system(size: 11, design: .rounded))
+                                    .foregroundColor(.primary.opacity(0.85))
+                                    .frame(width: 100, alignment: .center)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.vertical, 2)
+                            }
+                        }
+                        .padding(.vertical, 9)
+                        .background(rowIdx % 2 == 0 ? DS.bg1 : DS.bg1.opacity(0.6))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(label): \(values.joined(separator: ", "))")
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: DS.radiusM, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusM, style: .continuous)
+                        .strokeBorder(DS.textMuted.opacity(0.12), lineWidth: 1)
+                )
+            }
+        }
+    }
+}
+

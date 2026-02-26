@@ -33,6 +33,20 @@ class GitEngine: ObservableObject, @unchecked Sendable {
     @Published var lastOperation: GitOperation? = nil
     @Published var errorMessage: String? = nil
     @Published var newlyAddedCommitId: String? = nil
+    /// Simulates "working directory context" saved by git stash.
+    @Published var stashedWork: String? = nil
+
+    // MARK: Remote State
+    /// Simulated remote name.
+    let remoteName: String = "origin"
+    /// commitId that the remote tracking pointer (origin/<branch>) sits on, keyed by branch name.
+    @Published var remoteBranches: [String: String] = [:]
+    /// Number of local commits the current branch is ahead of its remote tracking branch.
+    @Published var remoteAhead: Int = 0
+    /// Number of remote commits that have not yet been pulled locally (simulated).
+    @Published var remoteBehind: Int = 0
+    /// Whether a fetch has been performed at least once (so the UI knows remote info is available).
+    @Published var hasFetched: Bool = false
 
     // MARK: Computed
     var currentBranch: Branch? { branches.first(where: { $0.name == headBranchName }) }
@@ -62,7 +76,12 @@ class GitEngine: ObservableObject, @unchecked Sendable {
         lastOperation = nil
         errorMessage = nil
         newlyAddedCommitId = nil
+        stashedWork = nil
         nextBranchColorIndex = 1
+        remoteBranches = ["main": c2.id]   // origin/main starts in sync
+        remoteAhead = 0
+        remoteBehind = 0
+        hasFetched = false
     }
 
     // MARK: - Commit
@@ -250,6 +269,52 @@ class GitEngine: ObservableObject, @unchecked Sendable {
         HapticEngine.success()
     }
 
+    // MARK: - Stash
+    /// Saves the current HEAD commit message as "stashed work" and logs the operation.
+    /// In a real Git repo this would save uncommitted working-tree changes;
+    /// here we simulate stashing the in-progress story so the user sees the concept.
+    func stash() {
+        guard stashedWork == nil else {
+            errorMessage = "Already have stashed work. Run git stash pop first."
+            HapticEngine.error()
+            return
+        }
+        let description = "WIP on \(headBranchName): \(headCommit?.message ?? "work in progress")"
+        stashedWork = description
+        log(.stash)
+        HapticEngine.impact(.medium)
+    }
+
+    /// Applies the stashed work back as a real commit on the current branch.
+    func stashPop() {
+        guard let stash = stashedWork,
+              var branch = currentBranch else {
+            errorMessage = stashedWork == nil ? "No stash entries found." : "No current branch."
+            HapticEngine.error()
+            return
+        }
+        let message = String(stash.dropFirst(stash.hasPrefix("WIP on ") ? 7 : 0))
+            .components(separatedBy: ": ").dropFirst().joined(separator: ": ")
+        let maxRow = (commits.max(by: { $0.row < $1.row })?.row ?? 0) + 1
+        var popped = CommitNode(
+            id: makeId(),
+            message: message.isEmpty ? "Stashed work" : message,
+            parentIds: [branch.headCommitId],
+            branchName: branch.name,
+            laneIndex: branch.laneIndex,
+            row: maxRow
+        )
+        popped.row = nextRow(after: branch.headCommitId, onLane: branch.laneIndex)
+        commits.append(popped)
+        branch.headCommitId = popped.id
+        updateBranch(branch)
+        newlyAddedCommitId = popped.id
+        stashedWork = nil
+        log(.stashPop)
+        recalculateLayout()
+        HapticEngine.success()
+    }
+
     // MARK: - Tag
     func addTag(name: String) {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -262,6 +327,74 @@ class GitEngine: ObservableObject, @unchecked Sendable {
         tags.append(tag)
         log(.tag(name: name))
         HapticEngine.impact(.light)
+    }
+
+    // MARK: - Fetch
+    /// Simulates `git fetch origin` — discovers any "remote" changes.
+    /// In our sandbox the remote can be "ahead" only after a pull simulation;
+    /// calling fetch refreshes the local knowledge of the remote state.
+    func fetch() {
+        hasFetched = true
+        // Simulate: remote might have one commit we don't have yet.
+        // We represent this as remoteBehind = 1 if remote pointer lags behind local HEAD.
+        let currentHeadId = currentBranch?.headCommitId ?? ""
+        let remoteHeadId  = remoteBranches[headBranchName] ?? ""
+        if remoteHeadId == currentHeadId {
+            // Already in sync — fabricate a "new" remote commit so the user has something to pull.
+            remoteBehind = 1
+        }
+        log(.fetch(remote: remoteName))
+        HapticEngine.impact(.light)
+    }
+
+    // MARK: - Push
+    /// Simulates `git push origin <branch>` — advances the remote tracking pointer to local HEAD.
+    func push(branchName: String? = nil) {
+        let target = branchName ?? headBranchName
+        guard let branch = branches.first(where: { $0.name == target }) else {
+            errorMessage = "Branch '\(target)' not found."
+            HapticEngine.error()
+            return
+        }
+        remoteBranches[target] = branch.headCommitId
+        remoteAhead = 0          // local is now in sync
+        remoteBehind = 0
+        log(.push(branch: target, remote: remoteName))
+        HapticEngine.impact(.medium)
+        HapticEngine.success()
+    }
+
+    // MARK: - Pull
+    /// Simulates `git pull origin <branch>` — adds a simulated "remote" commit then merges it in.
+    func pull(branchName: String? = nil) {
+        let target = branchName ?? headBranchName
+        guard var branch = branches.first(where: { $0.name == target }) else {
+            errorMessage = "Branch '\(target)' not found."
+            HapticEngine.error()
+            return
+        }
+        // Create the pretend remote commit on top of current HEAD.
+        let maxRow = (commits.max(by: { $0.row < $1.row })?.row ?? 0) + 1
+        var remoteCommit = CommitNode(
+            id: makeId(),
+            message: "chore: sync from \(remoteName)/\(target)",
+            parentIds: [branch.headCommitId],
+            branchName: branch.name,
+            laneIndex: branch.laneIndex,
+            row: maxRow
+        )
+        remoteCommit.row = nextRow(after: branch.headCommitId, onLane: branch.laneIndex)
+        commits.append(remoteCommit)
+        branch.headCommitId = remoteCommit.id
+        updateBranch(branch)
+        remoteBranches[target] = remoteCommit.id
+        remoteAhead = 0
+        remoteBehind = 0
+        newlyAddedCommitId = remoteCommit.id
+        log(.pull(branch: target, remote: remoteName))
+        recalculateLayout()
+        HapticEngine.impact(.medium)
+        HapticEngine.success()
     }
 
     // MARK: - Delete Branch
@@ -391,5 +524,19 @@ class GitEngine: ObservableObject, @unchecked Sendable {
 
     func isHead(_ commitId: String) -> Bool {
         currentBranch?.headCommitId == commitId
+    }
+
+    /// Returns true if the given commitId is the remote-tracking HEAD for its branch.
+    func isRemoteHead(_ commitId: String, branch: Branch) -> Bool {
+        remoteBranches[branch.name] == commitId
+    }
+
+    /// How many local commits are ahead of remote on the current branch.
+    func computeAhead() -> Int {
+        guard let branch = currentBranch,
+              let remoteId = remoteBranches[branch.name] else { return 0 }
+        let localAncestors  = ancestorIds(of: branch.headCommitId)
+        let remoteAncestors = Set(ancestorIds(of: remoteId))
+        return localAncestors.filter { !remoteAncestors.contains($0) }.count
     }
 }

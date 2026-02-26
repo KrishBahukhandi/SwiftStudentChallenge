@@ -15,7 +15,9 @@ struct CommandPanelView: View {
         case branch  = "Branch"
         case merge   = "Merge"
         case rebase  = "Rebase"
+        case stash   = "Stash"
         case tag     = "Tag"
+        case remote  = "Remote"
 
         var icon: String {
             switch self {
@@ -23,7 +25,9 @@ struct CommandPanelView: View {
             case .branch:  return "arrow.triangle.branch"
             case .merge:   return "arrow.triangle.merge"
             case .rebase:  return "arrow.up.arrow.down"
+            case .stash:   return "archivebox.fill"
             case .tag:     return "tag.fill"
+            case .remote:  return "icloud"
             }
         }
         var color: Color {
@@ -32,7 +36,9 @@ struct CommandPanelView: View {
             case .branch:  return DS.info
             case .merge:   return DS.success
             case .rebase:  return DS.warning
+            case .stash:   return DS.info
             case .tag:     return Color(hex: "#EC4899")
+            case .remote:  return Color(hex: "#0891B2")
             }
         }
     }
@@ -43,36 +49,43 @@ struct CommandPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(DS.accentLit)
-                            .accessibilityHidden(true)
-                        Text(engine.headBranchName)
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(DS.accentLit)
-                    }
+            // ── Header ───────────────────────────────────────────────
+            HStack(spacing: 10) {
+                // Branch indicator
+                HStack(spacing: 5) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(DS.accentLit)
+                        .accessibilityHidden(true)
+                    Text(engine.headBranchName)
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(DS.accentLit)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Capsule().fill(DS.accent.opacity(0.12)).overlay(Capsule().strokeBorder(DS.accent.opacity(0.25), lineWidth: 1)))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Current branch: \(engine.headBranchName)")
+
+                VStack(alignment: .leading, spacing: 1) {
                     Text("\(engine.commits.count) commits · \(engine.branches.count) branches")
                         .font(.system(size: 11, design: .rounded))
                         .foregroundColor(DS.textMuted)
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Current branch: \(engine.headBranchName). \(engine.commits.count) commits, \(engine.branches.count) branches.")
                 Spacer()
                 Button {
                     withAnimation(DS.springSnappy) { showHistory.toggle() }
                 } label: {
-                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        .font(.system(size: 16))
+                    Image(systemName: showHistory ? "clock.fill" : "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        .font(.system(size: 15))
                         .foregroundColor(showHistory ? DS.accentLit : DS.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(showHistory ? DS.accent.opacity(0.15) : DS.bg3))
                 }
                 .accessibilityLabel(showHistory ? "Hide command history" : "Show command history")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(DS.bg2)
 
             // Error message
@@ -106,50 +119,50 @@ struct CommandPanelView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             } else {
 
-                // Tab selector
-                ScrollView(.horizontal, showsIndicators: false) {
+                // ── Tab selector (2-row grid for compact width) ──────
+                let allTabs = CommandTab.allCases
+                let half = Int(ceil(Double(allTabs.count) / 2.0))
+                let row1 = Array(allTabs.prefix(half))
+                let row2 = Array(allTabs.suffix(allTabs.count - half))
+
+                VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        ForEach(CommandTab.allCases, id: \.self) { tab in
-                            Button {
+                        ForEach(row1, id: \.self) { tab in
+                            CommandTabButton(tab: tab, isSelected: selectedTab == tab) {
                                 withAnimation(DS.springSnappy) { selectedTab = tab }
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                }
-                                .foregroundColor(selectedTab == tab ? .white : DS.textSecondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(selectedTab == tab ? tab.color : DS.bg2)
-                                )
                             }
-                            .accessibilityLabel(tab.rawValue)
-                            .accessibilityAddTraits(selectedTab == tab ? [.isButton, .isSelected] : .isButton)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    HStack(spacing: 6) {
+                        ForEach(row2, id: \.self) { tab in
+                            CommandTabButton(tab: tab, isSelected: selectedTab == tab) {
+                                withAnimation(DS.springSnappy) { selectedTab = tab }
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
 
                 Divider().background(DS.textMuted.opacity(0.15))
 
-                // Panel content
-                Group {
-                    switch selectedTab {
-                    case .commit:  commitPanel
-                    case .branch:  branchPanel
-                    case .merge:   mergePanel
-                    case .rebase:  rebasePanel
-                    case .tag:     tagPanel
+                // Panel content — wrapped in ScrollView so tall panels (e.g. Remote) are accessible
+                ScrollView(showsIndicators: false) {
+                    Group {
+                        switch selectedTab {
+                        case .commit:  commitPanel
+                        case .branch:  branchPanel
+                        case .merge:   mergePanel
+                        case .rebase:  rebasePanel
+                        case .stash:   stashPanel
+                        case .tag:     tagPanel
+                        case .remote:  remotePanel
+                        }
                     }
+                    .padding(16)
+                    .transition(.opacity)
+                    .animation(DS.springSnappy, value: selectedTab)
                 }
-                .padding(16)
-                .transition(.opacity)
-                .animation(DS.springSnappy, value: selectedTab)
             }
         }
         .glassCard(cornerRadius: DS.radiusL)
@@ -343,6 +356,78 @@ struct CommandPanelView: View {
         }
     }
 
+    // MARK: - Stash Panel
+    var stashPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            CommandLabel(text: "git stash  /  git stash pop", color: DS.info)
+
+            if let saved = engine.stashedWork {
+                // Show stash entry + pop button
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "archivebox.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(DS.info)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("stash@{0}")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundColor(DS.info)
+                            Text(saved)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(DS.textMuted)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: DS.radiusS).fill(DS.info.opacity(0.08)))
+                    .overlay(RoundedRectangle(cornerRadius: DS.radiusS).strokeBorder(DS.info.opacity(0.2), lineWidth: 1))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Stash entry: \(saved)")
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            engine.stashPop()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "archivebox.circle.fill")
+                                    .font(.system(size: 13))
+                                Text("git stash pop")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            }
+                        }
+                        .buttonStyle(AccentButtonStyle(color: DS.info))
+                        .accessibilityLabel("git stash pop — restore stashed work")
+                    }
+                }
+            } else {
+                // No stash — show stash button
+                Text("No stash entries. Stash shelves your current WIP so you can switch context.")
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundColor(DS.textMuted)
+                    .lineSpacing(3)
+
+                HStack {
+                    Spacer()
+                    Button {
+                        engine.stash()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "archivebox.fill")
+                                .font(.system(size: 13))
+                            Text("git stash")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        }
+                    }
+                    .buttonStyle(AccentButtonStyle(color: DS.info))
+                    .accessibilityLabel("git stash — shelve working copy changes")
+                }
+            }
+        }
+    }
+
     // MARK: - Tag Panel
     var tagPanel: some View {
         let tagColor = Color(hex: "#EC4899")
@@ -364,6 +449,202 @@ struct CommandPanelView: View {
                 .accessibilityHint("Tags the current HEAD commit with your tag name")
             }
         }
+    }
+
+    // MARK: - Remote Panel
+    var remotePanel: some View {
+        let remoteColor = Color(hex: "#0891B2")
+        let ahead = engine.computeAhead()
+        let behind = engine.remoteBehind
+        let branch = engine.headBranchName
+        let remote = engine.remoteName
+
+        return VStack(alignment: .leading, spacing: 14) {
+            CommandLabel(text: "git fetch / push / pull", color: remoteColor)
+
+            // ── Remote status banner ──────────────────────────────────
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "icloud")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(remoteColor)
+                        .accessibilityHidden(true)
+                    Text("\(remote)/\(branch)")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundColor(remoteColor)
+                    Spacer()
+                    if !engine.hasFetched {
+                        Text("Run git fetch first")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundColor(DS.textMuted)
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    // Ahead pill
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("\(ahead) ahead")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(ahead > 0 ? DS.warning : DS.textMuted)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Capsule().fill((ahead > 0 ? DS.warning : DS.textMuted).opacity(0.1)))
+                    .accessibilityLabel("\(ahead) commits ahead of remote")
+
+                    // Behind pill
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("\(behind) behind")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(behind > 0 ? DS.info : DS.textMuted)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Capsule().fill((behind > 0 ? DS.info : DS.textMuted).opacity(0.1)))
+                    .accessibilityLabel("\(behind) commits behind remote")
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: DS.radiusM).fill(remoteColor.opacity(0.07)))
+            .overlay(RoundedRectangle(cornerRadius: DS.radiusM).strokeBorder(remoteColor.opacity(0.2), lineWidth: 1))
+
+            // ── Action buttons ────────────────────────────────────────
+            VStack(spacing: 8) {
+                // git fetch
+                Button {
+                    engine.fetch()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.down.to.line")
+                            .font(.system(size: 13))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("git fetch \(remote)")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            Text("Download remote history without merging")
+                                .font(.system(size: 10, design: .rounded))
+                                .opacity(0.7)
+                        }
+                        Spacer()
+                    }
+                }
+                .buttonStyle(RemoteActionButtonStyle(color: remoteColor))
+                .accessibilityLabel("git fetch — download remote changes")
+
+                // git push
+                Button {
+                    engine.push()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "icloud.and.arrow.up")
+                            .font(.system(size: 13))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("git push \(remote) \(branch)")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            Text("Upload local commits to the remote")
+                                .font(.system(size: 10, design: .rounded))
+                                .opacity(0.7)
+                        }
+                        Spacer()
+                        if ahead > 0 {
+                            Text("\(ahead)↑")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(DS.warning)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(DS.warning.opacity(0.15)))
+                        }
+                    }
+                }
+                .buttonStyle(RemoteActionButtonStyle(color: DS.success))
+                .accessibilityLabel("git push — upload local commits to remote")
+                .accessibilityHint("\(ahead) commits will be pushed")
+
+                // git pull
+                Button {
+                    engine.pull()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "icloud.and.arrow.down")
+                            .font(.system(size: 13))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("git pull \(remote) \(branch)")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            Text("Fetch + merge remote changes into HEAD")
+                                .font(.system(size: 10, design: .rounded))
+                                .opacity(0.7)
+                        }
+                        Spacer()
+                        if behind > 0 {
+                            Text("\(behind)↓")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(DS.info)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(DS.info.opacity(0.15)))
+                        }
+                    }
+                }
+                .buttonStyle(RemoteActionButtonStyle(color: DS.info))
+                .accessibilityLabel("git pull — download and merge remote commits")
+                .accessibilityHint("\(behind) remote commits will be merged in")
+            }
+        }
+    }
+}
+
+// MARK: - Command Tab Button
+private struct CommandTabButton: View {
+    let tab: CommandPanelView.CommandTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(tab.rawValue)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+            }
+            .foregroundColor(isSelected ? .white : DS.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: DS.radiusS, style: .continuous)
+                    .fill(isSelected ? tab.color : DS.bg3)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.radiusS, style: .continuous)
+                            .strokeBorder(isSelected ? tab.color.opacity(0.0) : DS.textMuted.opacity(0.12), lineWidth: 1)
+                    )
+            )
+        }
+        .accessibilityLabel(tab.rawValue)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+// MARK: - Remote Action Button Style
+struct RemoteActionButtonStyle: ButtonStyle {
+    let color: Color
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(configuration.isPressed ? color.opacity(0.7) : color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: DS.radiusM, style: .continuous)
+                    .fill(color.opacity(configuration.isPressed ? 0.18 : 0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.radiusM, style: .continuous)
+                    .strokeBorder(color.opacity(0.25), lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -407,7 +688,7 @@ struct CommandHistoryView: View {
                                 .accessibilityHidden(true)
                             Text(op.description)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(i == 0 ? .white : DS.textSecondary)
+                                .foregroundColor(i == 0 ? .primary : DS.textSecondary)
                                 .lineLimit(1)
                             Spacer()
                         }
@@ -432,7 +713,7 @@ extension View {
     func gitTextField() -> some View {
         self
             .font(.system(size: 14, design: .monospaced))
-            .foregroundColor(.white)
+            .foregroundColor(.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(

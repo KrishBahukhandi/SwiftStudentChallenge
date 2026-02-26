@@ -50,13 +50,13 @@ struct LessonPlaygroundView: View {
         .sheet(isPresented: $showCommitSheet, onDismiss: { selectedCommitId = nil }) {
             if let cid = selectedCommitId {
                 CommitDetailSheet(commitId: cid, engine: playEngine, selectedCommitId: $selectedCommitId)
-                    .preferredColorScheme(.dark)
             }
         }
         // Watch engine state to detect when goal is met
         .onReceive(playEngine.$commandHistory) { _ in checkCompletion() }
         .onReceive(playEngine.$commits)        { _ in checkCompletion() }
         .onReceive(playEngine.$branches)       { _ in checkCompletion() }
+        .onReceive(playEngine.$stashedWork)    { _ in checkCompletion() }
     }
 
     // MARK: - Header bar
@@ -204,6 +204,7 @@ struct LessonPlaygroundView: View {
         case "rebase":      return "Rebase 'feature' onto 'main'"
         case "reset":       return "Reset HEAD to an earlier commit"
         case "cherry-pick": return "Cherry-pick a commit from 'feature'"
+        case "stash":       return "Stash your work, then pop it back"
         default:            return "Try any command below"
         }
     }
@@ -225,6 +226,11 @@ struct LessonPlaygroundView: View {
             completed = playEngine.commandHistory.contains { if case .reset = $0 { return true }; return false }
         case "cherry-pick":
             completed = playEngine.commandHistory.contains { if case .cherryPick = $0 { return true }; return false }
+        case "stash":
+            // Goal: stash at least once AND pop it back
+            let didStash   = playEngine.commandHistory.contains { if case .stash    = $0 { return true }; return false }
+            let didStashPop = playEngine.commandHistory.contains { if case .stashPop = $0 { return true }; return false }
+            completed = didStash && didStashPop
         default: break
         }
     }
@@ -254,6 +260,10 @@ struct LessonPlaygroundView: View {
             playEngine.commit(message: "Bugfix A")
             playEngine.commit(message: "Bugfix B")
             playEngine.checkout(branchName: "main")
+        case "stash":
+            // Set up: one commit of WIP ready to stash, then a hotfix branch to switch to
+            playEngine.commit(message: "Work in progress: new UI")
+            playEngine.createBranch(name: "hotfix")
         default: break
         }
         playEngine.commandHistory = []
@@ -424,6 +434,59 @@ private struct FocusedCommandWidget: View {
                             }
                         }
                     }
+                }
+
+            // ── Stash ──────────────────────────────────────────
+            case "stash":
+                commandLabel("git stash / git stash pop", color: DS.info)
+                branchHint("Stash your WIP, switch to 'hotfix', do a fix, then pop the stash back.")
+
+                // Stash indicator
+                if let saved = engine.stashedWork {
+                    HStack(spacing: 8) {
+                        Image(systemName: "archivebox.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(DS.info)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("1 stash entry")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundColor(DS.info)
+                            Text(saved)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(DS.textMuted)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Button {
+                            engine.stashPop()
+                        } label: {
+                            Text("git stash pop")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundColor(DS.info)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Capsule().fill(DS.info.opacity(0.15)))
+                                .overlay(Capsule().strokeBorder(DS.info.opacity(0.3), lineWidth: 1))
+                        }
+                        .accessibilityLabel("git stash pop — restore stashed work")
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: DS.radiusM).fill(DS.info.opacity(0.07)))
+                    .overlay(RoundedRectangle(cornerRadius: DS.radiusM).strokeBorder(DS.info.opacity(0.2), lineWidth: 1))
+                } else {
+                    Button {
+                        engine.stash()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "archivebox.fill")
+                                .font(.system(size: 13))
+                            Text("git stash")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(AccentButtonStyle(color: DS.info))
+                    .accessibilityLabel("git stash — save work in progress")
                 }
 
             default:

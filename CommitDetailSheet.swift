@@ -47,7 +47,7 @@ struct CommitDetailSheet: View {
 
                             Text(commit?.message ?? "")
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .multilineTextAlignment(.center)
                                 .accessibilityLabel("Commit message: \(commit?.message ?? "")")
 
@@ -163,7 +163,6 @@ struct CommitDetailSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .alert("Cherry-pick this commit?", isPresented: $showCherryPickConfirm) {
             Button("Cherry-pick") {
                 engine.cherryPick(commitId: commitId)
@@ -202,7 +201,7 @@ struct DetailRow: View {
             Spacer()
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 16)

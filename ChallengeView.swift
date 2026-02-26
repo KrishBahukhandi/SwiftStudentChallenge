@@ -48,7 +48,7 @@ struct ChallengeListView: View {
                             .accessibilityHidden(true)
                         Text("Challenges")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -66,7 +66,7 @@ struct ChallengeListView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(done) of \(total) completed")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(DS.bg2).frame(height: 6)
@@ -123,43 +123,61 @@ struct ChallengeCard: View {
     let isCompleted: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(challenge.difficulty.badge)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(challenge.difficulty.color)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Capsule().fill(challenge.difficulty.color.opacity(0.15)))
-                Spacer()
-                if isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(DS.success).font(.system(size: 16))
-                } else if !isUnlocked {
-                    Image(systemName: "lock.fill")
-                        .foregroundColor(DS.textMuted).font(.system(size: 14))
+        ZStack(alignment: .topTrailing) {
+            // ── Card content (always visible) ──────────────────
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(challenge.difficulty.badge)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(challenge.difficulty.color)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Capsule().fill(challenge.difficulty.color.opacity(0.15)))
+                    Spacer()
+                    // Checkmark only shown when unlocked+complete
+                    if isCompleted {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(DS.success).font(.system(size: 16))
+                    }
+                }
+
+                Text(challenge.title)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+
+                Text(challenge.description)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundColor(DS.textMuted)
+                    .lineLimit(3)
+
+                if let op = challenge.operations.first {
+                    Text(op)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(DS.accent.opacity(isUnlocked ? 0.9 : 0.4))
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(DS.accent.opacity(isUnlocked ? 0.12 : 0.06)))
                 }
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 155, alignment: .topLeading)
 
-            Text(challenge.title)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(isUnlocked ? .white : DS.textMuted)
-                .lineLimit(2)
-
-            Text(challenge.description)
-                .font(.system(size: 12, design: .rounded))
-                .foregroundColor(DS.textMuted)
-                .lineLimit(3)
-
-            if isUnlocked, let op = challenge.operations.first {
-                Text(op)
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(DS.accent.opacity(0.9))
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(Capsule().fill(DS.accent.opacity(0.12)))
+            // ── Frosted lock overlay (locked only) ─────────────
+            if !isUnlocked {
+                RoundedRectangle(cornerRadius: DS.radiusL, style: .continuous)
+                    .fill(DS.bg0.opacity(0.55))
+                    .overlay(
+                        VStack(spacing: 6) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(DS.textMuted)
+                            Text("Complete previous\nchallenge to unlock")
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundColor(DS.textMuted)
+                                .multilineTextAlignment(.center)
+                        }
+                    )
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 155, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: DS.radiusL, style: .continuous)
                 .fill(isCompleted ? DS.success.opacity(0.08) : DS.bg1)
@@ -167,12 +185,12 @@ struct ChallengeCard: View {
                     RoundedRectangle(cornerRadius: DS.radiusL, style: .continuous)
                         .strokeBorder(
                             isCompleted ? DS.success.opacity(0.4) :
-                            isUnlocked  ? DS.accent.opacity(0.2)  : DS.textMuted.opacity(0.1),
+                            isUnlocked  ? DS.accent.opacity(0.2)  : DS.textMuted.opacity(0.08),
                             lineWidth: 1
                         )
                 )
         )
-        .opacity(isUnlocked ? 1.0 : 0.55)
+        .clipShape(RoundedRectangle(cornerRadius: DS.radiusL, style: .continuous))
     }
 }
 
@@ -181,6 +199,14 @@ struct ActiveChallengeView: View {
     let challenge: GitChallenge
     @ObservedObject var engine: ChallengeEngine
     @Binding var activeChallengeId: String?
+
+    /// The challenge that comes after this one (nil if this is the last)
+    private var nextChallenge: GitChallenge? {
+        guard let idx = engine.challenges.firstIndex(where: { $0.id == challenge.id }),
+              idx + 1 < engine.challenges.count
+        else { return nil }
+        return engine.challenges[idx + 1]
+    }
 
     @State private var selectedCommitId: String? = nil
     @State private var showHints = false
@@ -206,7 +232,7 @@ struct ActiveChallengeView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(challenge.title)
                             .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text(challenge.difficulty.badge)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(challenge.difficulty.color)
@@ -266,10 +292,19 @@ struct ActiveChallengeView: View {
             }
 
             if engine.isComplete {
-                ChallengeSuccessOverlay(challenge: challenge) {
-                    engine.reset()
-                    activeChallengeId = nil
-                }
+                ChallengeSuccessOverlay(
+                    challenge: challenge,
+                    nextChallenge: nextChallenge,
+                    onBack: {
+                        engine.reset()
+                        activeChallengeId = nil
+                    },
+                    onNextChallenge: { next in
+                        engine.reset()
+                        engine.start(next)
+                        activeChallengeId = next.id
+                    }
+                )
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
@@ -281,7 +316,6 @@ struct ActiveChallengeView: View {
         .sheet(isPresented: $showSheet, onDismiss: { selectedCommitId = nil }) {
             if let cid = selectedCommitId {
                 CommitDetailSheet(commitId: cid, engine: engine.engine, selectedCommitId: $selectedCommitId)
-                    .preferredColorScheme(.dark)
             }
         }
         .onReceive(engine.engine.$commandHistory) { _ in engine.checkGoal() }
@@ -308,7 +342,7 @@ struct ChallengeGoalBanner: View {
                     .foregroundColor(DS.textMuted)
                 Text(goal.description)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(isComplete ? DS.success : .white)
+                    .foregroundColor(isComplete ? DS.success : .primary)
             }
             Spacer()
             if isComplete {
@@ -349,7 +383,7 @@ struct ChallengeHintPanel: View {
                     .foregroundColor(Color(hex: "#F59E0B")).font(.system(size: 13))
                 Text("Hints")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                 Spacer()
                 if engine.hintsRevealed < challenge.hints.count {
                     Button("Reveal next") { engine.revealNextHint() }
@@ -397,16 +431,20 @@ struct ChallengeHintPanel: View {
 // MARK: - Success Overlay
 struct ChallengeSuccessOverlay: View {
     let challenge: GitChallenge
+    let nextChallenge: GitChallenge?
     let onBack: () -> Void
+    let onNextChallenge: (GitChallenge) -> Void
 
     @State private var scaleIn: CGFloat = 0.5
     @State private var opacityIn: Double = 0
+    @State private var showConfetti = false
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
 
             VStack(spacing: 24) {
+                // Trophy icon
                 Image(systemName: "trophy.fill")
                     .font(.system(size: 64, weight: .bold))
                     .foregroundStyle(
@@ -417,6 +455,7 @@ struct ChallengeSuccessOverlay: View {
                     )
                     .shadow(color: Color(hex: "#F59E0B").opacity(0.5), radius: 20)
 
+                // Challenge info
                 VStack(spacing: 8) {
                     Text("Challenge Complete!")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -438,17 +477,43 @@ struct ChallengeSuccessOverlay: View {
                     }
                 }
 
-                Button(action: onBack) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "list.bullet").accessibilityHidden(true)
-                        Text("Back to Challenges")
+                // Action buttons
+                VStack(spacing: 10) {
+                    // Primary: Next challenge (if available)
+                    if let next = nextChallenge {
+                        Button {
+                            onNextChallenge(next)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("Next: \(next.title)")
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: 260)
+                        }
+                        .buttonStyle(AccentButtonStyle(color: DS.accent))
+                        .accessibilityLabel("Next challenge: \(next.title)")
                     }
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: 260)
+
+                    // Secondary: Back to list
+                    Button(action: onBack) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "list.bullet").accessibilityHidden(true)
+                            Text(nextChallenge != nil ? "Back to Challenges" : "All Done! Back to List")
+                        }
+                        .font(.system(size: nextChallenge != nil ? 14 : 16,
+                                      weight: nextChallenge != nil ? .medium : .semibold,
+                                      design: .rounded))
+                        .foregroundColor(nextChallenge != nil ? DS.textSecondary : .white)
+                        .frame(maxWidth: 260)
+                    }
+                    .buttonStyle(AccentButtonStyle(
+                        color: nextChallenge != nil ? DS.textMuted : DS.success
+                    ))
+                    .accessibilityLabel("Back to challenges list")
                 }
-                .buttonStyle(AccentButtonStyle(color: DS.success))
-                .accessibilityLabel("Back to challenges list")
             }
             .padding(36)
             .background(
@@ -462,11 +527,21 @@ struct ChallengeSuccessOverlay: View {
             .padding(.horizontal, 28)
             .scaleEffect(scaleIn)
             .opacity(opacityIn)
+            // Confetti burst
+            if showConfetti {
+                ConfettiView()
+                    .ignoresSafeArea()
+            }
         }
         .onAppear {
             withAnimation(DS.springBouncy) {
                 scaleIn = 1.0
                 opacityIn = 1.0
+            }
+            // Trigger confetti after card finishes animating in
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                showConfetti = true
             }
         }
         .accessibilityElement(children: .contain)

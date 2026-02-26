@@ -4,6 +4,18 @@ import SwiftUI
 struct LearnView: View {
     @EnvironmentObject var engine: GitEngine
     @State private var currentPage = 0
+    @State private var showAbout = false
+
+    // Persist which lesson IDs the user has visited
+    @AppStorage("seenLessonIds_v1") private var seenRaw: String = ""
+    private var seenIds: Set<String> {
+        Set(seenRaw.split(separator: ",").map(String.init))
+    }
+    private func markSeen(_ id: String) {
+        var ids = seenIds
+        ids.insert(id)
+        seenRaw = ids.joined(separator: ",")
+    }
 
     let lessons = GitLessonData.all
 
@@ -17,13 +29,23 @@ struct LearnView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Learn Git")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text("Interactive visual lessons")
                             .font(.system(size: 14, design: .rounded))
                             .foregroundColor(DS.textMuted)
                     }
                     Spacer()
-                    // Progress
+
+                    // About button
+                    Button { showAbout = true } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(DS.textSecondary)
+                    }
+                    .accessibilityLabel("About this app")
+                    .padding(.trailing, 10)
+
+                    // Progress ring
                     ZStack {
                         Circle()
                             .stroke(DS.bg3, lineWidth: 3)
@@ -33,7 +55,7 @@ struct LearnView: View {
                             .rotationEffect(.degrees(-90))
                         Text("\(currentPage + 1)/\(lessons.count)")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                     }
                     .frame(width: 48, height: 48)
                     .animation(DS.springSmooth, value: currentPage)
@@ -74,11 +96,19 @@ struct LearnView: View {
 
                     HStack(spacing: 6) {
                         ForEach(0..<lessons.count, id: \.self) { i in
-                            Circle()
-                                .fill(i == currentPage ? DS.accentLit : DS.textMuted.opacity(0.4))
-                                .frame(width: i == currentPage ? 10 : 6, height: i == currentPage ? 10 : 6)
-                                .animation(DS.springSnappy, value: currentPage)
-                                .accessibilityHidden(true)
+                            if seenIds.contains(lessons[i].id) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: i == currentPage ? 11 : 8))
+                                    .foregroundColor(i == currentPage ? DS.accentLit : DS.success.opacity(0.75))
+                                    .animation(DS.springSnappy, value: currentPage)
+                                    .accessibilityHidden(true)
+                            } else {
+                                Circle()
+                                    .fill(i == currentPage ? DS.accentLit : DS.textMuted.opacity(0.4))
+                                    .frame(width: i == currentPage ? 10 : 6, height: i == currentPage ? 10 : 6)
+                                    .animation(DS.springSnappy, value: currentPage)
+                                    .accessibilityHidden(true)
+                            }
                         }
                     }
 
@@ -101,6 +131,13 @@ struct LearnView: View {
                 .padding(.bottom, 20)
                 .padding(.top, 8)
             }
+        }
+        .onAppear { markSeen(lessons[currentPage].id) }
+        .onChange(of: currentPage) { newPage in
+            markSeen(lessons[newPage].id)
+        }
+        .sheet(isPresented: $showAbout) {
+            AboutView { showAbout = false }
         }
     }
 }
@@ -130,7 +167,7 @@ struct LessonCard: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(lesson.title)
                             .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         Text(lesson.subtitle)
                             .font(.system(size: 13, design: .rounded))
                             .foregroundColor(DS.textMuted)
@@ -177,7 +214,7 @@ struct LessonCard: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(step.title)
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundColor(i <= stepIndex ? .white : DS.textSecondary)
+                                    .foregroundColor(i <= stepIndex ? .primary : DS.textSecondary)
                                 if i <= stepIndex {
                                     Text(step.detail)
                                         .font(.system(size: 12, design: .rounded))
@@ -224,7 +261,7 @@ struct LessonCard: View {
                                 .accessibilityHidden(true)
                             Text(op.description)
                                 .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Spacer()
                         }
                         .padding(12)
@@ -273,7 +310,6 @@ struct LessonCard: View {
             LessonPlaygroundView(lesson: lesson) {
                 showPlayground = false
             }
-            .preferredColorScheme(.dark)
         }
     }
 }
@@ -370,6 +406,34 @@ struct LessonMiniGraph: View {
                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4]))
             [c1,c2,c3].forEach { drawNode(ctx: ctx, at: $0, color: Color.branchColors[0], r: r, label: "") }
             drawNode(ctx: ctx, at: c4, color: DS.success, r: r, label: "✦")
+
+        case "Remote & Push/Pull":
+            // Local chain on left, remote cloud on right
+            let loc1 = CGPoint(x: cx - 40, y: size.height - 20)
+            let loc2 = CGPoint(x: cx - 40, y: cy + 20)
+            let loc3 = CGPoint(x: cx - 40, y: 24)
+            let rem1 = CGPoint(x: cx + 44, y: cy + 20)
+            let rem2 = CGPoint(x: cx + 44, y: 24)
+            // Draw local chain
+            drawLine(ctx: ctx, from: loc1, to: loc2, color: Color.branchColors[0])
+            drawLine(ctx: ctx, from: loc2, to: loc3, color: Color.branchColors[0])
+            // Dashed push arrow
+            var pushPath = Path()
+            pushPath.move(to: loc2)
+            pushPath.addLine(to: rem1)
+            ctx.stroke(pushPath, with: .color(DS.success.opacity(0.5 + phase * 0.45)),
+                       style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [5, 3]))
+            // Dashed pull arrow
+            var pullPath = Path()
+            pullPath.move(to: rem2)
+            pullPath.addLine(to: loc3)
+            ctx.stroke(pullPath, with: .color(Color(hex: "#0891B2").opacity(0.4 + phase * 0.4)),
+                       style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [5, 3]))
+            drawNode(ctx: ctx, at: loc1, color: Color.branchColors[0], r: r, label: "")
+            drawNode(ctx: ctx, at: loc2, color: Color.branchColors[0], r: r, label: "")
+            drawNode(ctx: ctx, at: loc3, color: Color.branchColors[0], r: r, label: "")
+            drawNode(ctx: ctx, at: rem1, color: Color(hex: "#0891B2"), r: r, label: "")
+            drawNode(ctx: ctx, at: rem2, color: DS.success, r: r, label: "↑")
 
         default:
             let pts = [CGPoint(x: cx, y: size.height-20), CGPoint(x: cx, y: cy), CGPoint(x: cx, y: 20)]
@@ -495,6 +559,36 @@ struct GitLessonData {
                 LessonStep(title: "New hash, same changes", detail: "The new commit has a different hash but the same diff."),
             ],
             operation: .cherryPick(hash: "abc1234")
+        ),
+        GitLesson(
+            id: "stash",
+            title: "Stash",
+            subtitle: "Context-switch without committing",
+            icon: "archivebox.fill",
+            color: DS.info,
+            explanation: "git stash temporarily shelves changes you've made so you can work on something else, then come back. Think of it as putting work-in-progress in a drawer — your working tree is clean, but nothing is lost.",
+            steps: [
+                LessonStep(title: "You have work in progress", detail: "You're mid-feature but urgently need to fix a bug on another branch."),
+                LessonStep(title: "git stash", detail: "Saves your WIP to the stash stack and reverts your working tree to the last commit."),
+                LessonStep(title: "Fix the bug", detail: "Switch branches, fix the bug, commit — your main line is clean."),
+                LessonStep(title: "git stash pop", detail: "Restores your saved work as a new commit, picking up exactly where you left off."),
+            ],
+            operation: .stash
+        ),
+        GitLesson(
+            id: "remote",
+            title: "Remote & Push/Pull",
+            subtitle: "Collaborating via a shared server",
+            icon: "icloud",
+            color: Color(hex: "#0891B2"),
+            explanation: "A remote is a version of your repository hosted on a server (like GitHub). You use git push to upload your local commits and git pull to download changes others have made. git fetch downloads remote history without merging it — giving you time to review before integrating.",
+            steps: [
+                LessonStep(title: "git remote add origin <url>", detail: "Register a remote repository URL under the alias 'origin'."),
+                LessonStep(title: "git fetch origin", detail: "Download all remote branches and commits without changing your working directory."),
+                LessonStep(title: "git pull origin main", detail: "Fetch AND immediately merge the remote main into your current branch."),
+                LessonStep(title: "git push origin main", detail: "Upload your local commits to the remote so teammates can see them."),
+            ],
+            operation: .push(branch: "main", remote: "origin")
         ),
     ]
 }
